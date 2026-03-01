@@ -1,12 +1,11 @@
 import os, threading, time
-from flask import Flask, request, render_template, redirect, url_for, flash
+from flask import Flask, request
 import requests
 from dotenv import load_dotenv
 
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.urandom(16)
 
 API_KEY = os.getenv("API_KEY")
 SECRET = os.getenv("SECRET")
@@ -36,35 +35,26 @@ def set_gamepass_price(gamepass_id, price, duration=None):
         FLASH_SALES[gamepass_id] = price
         threading.Thread(target=revert_price, args=(gamepass_id, price, duration)).start()
 
-# --- Routes ---
-@app.route("/", methods=["GET", "POST"])
-def index():
-    if request.method == "POST":
-        secret = request.form.get("secret")
-        gamepass_id = int(request.form.get("gamepass"))
-        price = int(request.form.get("price"))
-        duration = request.form.get("duration")
-        duration = int(duration) if duration else None
+# --- API Routes ---
+@app.route("/update-price", methods=["POST"])
+def update_price():
+    data = request.json
+    if data.get("secret") != SECRET:
+        return "Unauthorized", 401
+    gamepass_id = data["gamepassId"]
+    price = data["price"]
+    duration = data.get("duration")
+    set_gamepass_price(gamepass_id, price, duration)
+    return "OK", 200
 
-        if secret != SECRET:
-            flash("❌ Invalid secret key!", "danger")
-            return redirect(url_for("index"))
-
-        set_gamepass_price(gamepass_id, price, duration)
-        flash(f"✅ Gamepass {gamepass_id} price updated!", "success")
-        return redirect(url_for("index"))
-
-    return render_template("index.html", flash_sales=FLASH_SALES)
-
-# Optional webhook route for Roblox purchases
 @app.route("/purchase", methods=["POST"])
 def purchase():
     data = request.json
     if data.get("secret") != SECRET:
         return "Unauthorized", 401
-    user = data.get("username")
+    username = data.get("username")
     gamepass_id = data.get("gamepassId")
-    update_discord_embed("Gamepass Purchased", f"{user} bought gamepass `{gamepass_id}`")
+    update_discord_embed("Gamepass Purchased", f"{username} bought gamepass `{gamepass_id}`")
     return "OK", 200
 
 if __name__ == "__main__":
