@@ -7,13 +7,13 @@ load_dotenv()
 
 app = Flask(__name__)
 
-API_KEY = os.getenv("API_KEY")
+API_KEY = os.getenv("API_KEY")  # Optional if using gamepass PATCH
 SECRET = os.getenv("SECRET")
 DISCORD_WEBHOOK = os.getenv("DISCORD_WEBHOOK")
 
 FLASH_SALES = {}  # {gamepass_id: original_price}
 
-# --- Helper Functions ---
+# --- Helpers ---
 def update_discord_embed(title, description, color=0x00aaff):
     embed = {"title": title, "description": description, "color": color}
     requests.post(DISCORD_WEBHOOK, json={"embeds":[embed]})
@@ -35,7 +35,7 @@ def set_gamepass_price(gamepass_id, price, duration=None):
         FLASH_SALES[gamepass_id] = price
         threading.Thread(target=revert_price, args=(gamepass_id, price, duration)).start()
 
-# --- API Routes ---
+# --- API Endpoints ---
 @app.route("/update-price", methods=["POST"])
 def update_price():
     data = request.json
@@ -52,9 +52,16 @@ def purchase():
     data = request.json
     if data.get("secret") != SECRET:
         return "Unauthorized", 401
+
     username = data.get("username")
-    gamepass_id = data.get("gamepassId")
-    update_discord_embed("Gamepass Purchased", f"{username} bought gamepass `{gamepass_id}`")
+    robloxUserId = data.get("robloxUserId")
+    tier = data.get("tier")
+
+    update_discord_embed(
+        "Tier Purchased",
+        f"{username} ({robloxUserId}) purchased **{tier}** tier!"
+    )
+
     return "OK", 200
 
 if __name__ == "__main__":
